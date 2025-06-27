@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>JavaScript Promise Performance Optimization</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    h1 { text-align: center; }
+    h2 { margin-top: 30px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+    p { line-height: 1.6; }
+    .results { font-weight: bold; color: #333; min-height: 1.2em; /* Ensure space for "Running..." text */ }
+    .explanation-text { margin-top: 5px; font-style: italic; color: #555; }
+    ul { list-style-type: disc; margin-left: 20px; }
+    .demo-section {
+        margin-bottom: 20px;
+        padding: 15px;
+        border: 1px solid #ddd; /* Slightly darker border */
+        border-radius: 5px;
+        background-color: #f9f9f9; /* Light background for sections */
+    }
+    button {
+        padding: 8px 15px;
+        margin-top: 10px;
+        margin-bottom: 10px;
+        cursor: pointer;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-size: 1em;
+    }
+    button:hover {
+        background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <h1>JavaScript Promise Performance Optimization Demonstrations</h1>
+  <p>This page interactively demonstrates various JavaScript Promise methods. Click the button in each section below to run the corresponding live demonstration and observe how these methods manage asynchronous operations and impact performance.</p>
+
+  <div class="demo-section">
+    <h2>Sequential Task Execution</h2>
+    <p class="explanation-text">
+      Sequential processing means tasks are executed one after another. Each task must complete before the next one begins. 
+      This approach is straightforward but can be inefficient if tasks are independent and could run concurrently. 
+      Click the button below to run three simulated tasks sequentially and observe the total time taken. 
+      Note the individual task completion messages in the browser's console.
+    </p>
+    <button id="run-sequential-demo-btn">Run Sequential Demo</button>
+    <p id="sequential-only-results" class="results">Click the button to see sequential execution time.</p>
+  </div>
+
+  <div class="demo-section">
+    <h2>Demonstrating Promise.all()</h2>
+    <p class="explanation-text">
+      <code>Promise.all()</code> allows you to run multiple independent asynchronous operations concurrently. It takes an array of promises and waits for all of them to resolve before it resolves. 
+      If any promise in the array rejects, <code>Promise.all()</code> immediately rejects. 
+      This method significantly improves performance for independent tasks compared to the sequential approach (as shown in the "Sequential Task Execution" demo above) because the tasks can overlap their execution time. 
+      Click the button below to run the same three tasks using <code>Promise.all()</code> and compare the execution time.
+    </p>
+    <button id="run-promise-all-btn">Run Promise.all() Demo</button>
+    <p id="promise-all-results" class="results"></p>
+  </div>
+
+  <div class="demo-section">
+    <h2>Demonstrating Promise.race()</h2>
+    <p class="explanation-text">
+      <code>Promise.race()</code> takes an array of promises and settles (resolves or rejects) as soon as the first promise in the array settles. 
+      It is beneficial for performance when you have multiple sources for the same data and want to use the result from the quickest one, 
+      or when implementing a timeout for an operation. For instance, you could fetch a critical resource from primary or backup servers, using whichever responds first.
+      Click the button below to see which task wins the race.
+    </p>
+    <button id="run-race-demo-btn">Run Promise.race() Demo</button>
+    <p id="promise-race-result" class="results"></p>
+  </div>
+
+  <div class="demo-section">
+    <h2>Demonstrating Promise.any()</h2>
+    <p class="explanation-text">
+      <code>Promise.any()</code> takes an array of promises and resolves as soon as the first promise in the iterable fulfills (resolves). 
+      It ignores all rejections unless all promises reject, in which case it throws an <code>AggregateError</code>. 
+      This is useful for performance when you need just one successful outcome from multiple independent operations and want it as quickly as possible. 
+      For example, you might try to download a file from several mirror servers, using the first successful download and ignoring any that fail.
+      Click the button below to see the first successful operation.
+    </p>
+    <button id="run-any-demo-btn">Run Promise.any() Demo</button>
+    <p id="promise-any-result" class="results"></p>
+  </div>
+
+  <div class="demo-section">
+    <h2>Demonstrating Promise.allSettled()</h2>
+    <p class="explanation-text">
+      <code>Promise.allSettled()</code> waits for all input promises to complete, regardless of whether they resolve or reject. 
+      It returns an array of objects, where each object describes the outcome of a promise with a <code>status</code> property (<code>"fulfilled"</code> or <code>"rejected"</code>) 
+      and either a <code>value</code> (if fulfilled) or a <code>reason</code> (if rejected). 
+      This is particularly useful when you have multiple independent asynchronous tasks and need to know the outcome of each one, even if some fail. 
+      For instance, you might use it to update a UI showing the status of various background operations or for comprehensive logging where one failure should not prevent others from completing and being recorded.
+      Click the button below to see the outcome of all operations.
+    </p>
+    <button id="run-allsettled-demo-btn">Run Promise.allSettled() Demo</button>
+    <p id="promise-allSettled-results-title" class="results"></p>
+    <ul id="promise-allSettled-results-list"></ul>
+    <p id="promise-allSettled-time" class="results"></p>
+  </div>
+
+  <script>
+    /**
+     * Simulates an asynchronous task (e.g., API call, file read) that resolves after a 1000ms delay.
+     * Used by both Sequential and Promise.all() demonstrations.
+     * @returns {Promise<string>} A promise that resolves with "Task 1 Complete".
+     */
+    function task1() {
+        console.log("Task 1 started...");
+        return new Promise(resolve => setTimeout(() => { console.log("Task 1 resolving."); resolve("Task 1 Complete"); }, 1000));
+    }
+    /**
+     * Simulates an asynchronous task that resolves after a 1500ms delay.
+     * Used by both Sequential and Promise.all() demonstrations.
+     * @returns {Promise<string>} A promise that resolves with "Task 2 Complete".
+     */
+    function task2() {
+        console.log("Task 2 started...");
+        return new Promise(resolve => setTimeout(() => { console.log("Task 2 resolving."); resolve("Task 2 Complete"); }, 1500));
+    }
+    /**
+     * Simulates an asynchronous task that resolves after a 500ms delay.
+     * Used by both Sequential and Promise.all() demonstrations.
+     * @returns {Promise<string>} A promise that resolves with "Task 3 Complete".
+     */
+    function task3() {
+        console.log("Task 3 started...");
+        return new Promise(resolve => setTimeout(() => { console.log("Task 3 resolving."); resolve("Task 3 Complete"); }, 500));
+    }
+
+    /**
+     * Handles the demonstration for Sequential Task Execution.
+     * It clears previous results, runs task1, task2, and task3 one after another, 
+     * measures the total time taken, and updates the DOM with the results and time.
+     */
+    async function handleSequentialDemo() {
+      const resultsElement = document.getElementById('sequential-only-results');
+      resultsElement.textContent = 'Running sequential demo... Please wait.'; // Updated initial message
+      console.log("Button Click: Starting sequential demo...");
+
+      const startTimeSequential = performance.now();
+      const r1s = await task1(); console.log(r1s); // Await task1 before starting task2
+      const r2s = await task2(); console.log(r2s); // Await task2 before starting task3
+      const r3s = await task3(); console.log(r3s); // Await task3
+      const endTimeSequential = performance.now();
+      const totalTimeSequential = endTimeSequential - startTimeSequential;
+
+      resultsElement.textContent = `Sequential execution time: ${totalTimeSequential.toFixed(2)} ms. Results: ${r1s}, ${r2s}, ${r3s}.`;
+      console.log(`Sequential execution completed in ${totalTimeSequential.toFixed(2)} ms. Results: ${r1s}, ${r2s}, ${r3s}.`);
+    }
+    
+    /**
+     * Handles the demonstration for Promise.all().
+     * It clears previous results, runs task1, task2, and task3 concurrently using Promise.all(),
+     * measures the total time taken (which should be close to the longest individual task), 
+     * and updates the DOM with the results and time.
+     */
+    async function handlePromiseAllDemo() {
+      const resultsElement = document.getElementById('promise-all-results');
+      resultsElement.textContent = 'Running Promise.all() demo... Please wait.'; // Updated initial message
+      console.log("Button Click: Starting Promise.all() demo...");
+
+      const startTimePromiseAll = performance.now();
+      // task1, task2, and task3 are invoked concurrently
+      const resultsPromiseAll = await Promise.all([task1(), task2(), task3()]);
+      const endTimePromiseAll = performance.now();
+      const totalTimePromiseAll = endTimePromiseAll - startTimePromiseAll;
+
+      resultsElement.textContent = `Promise.all() execution time: ${totalTimePromiseAll.toFixed(2)} ms. Results: ${resultsPromiseAll.join(', ')}.`;
+      console.log(`Concurrent execution with Promise.all() completed in ${totalTimePromiseAll.toFixed(2)} ms. Results: ${resultsPromiseAll.join(', ')}.`);
+    }
+
+    /**
+     * Handles the demonstration for Promise.race().
+     * Clears previous results, runs tasks, measures performance, and updates the DOM with the winner.
+     */
+    async function handlePromiseRaceDemo() {
+      document.getElementById('promise-race-result').textContent = 'Running Promise.race() demo...';
+
+      const fetchFromSource1 = () => new Promise(resolve => setTimeout(() => resolve("Data from Source 1 (Fast)"), 800));
+      const fetchFromSource2 = () => new Promise(resolve => setTimeout(() => resolve("Data from Source 2 (Slow)"), 1200));
+
+      console.log("Button Click: Starting Promise.race() demonstration...");
+      const startTimeRace = performance.now();
+      const raceResult = await Promise.race([fetchFromSource1(), fetchFromSource2()]);
+      const endTimeRace = performance.now();
+      const totalTimeRace = endTimeRace - startTimeRace;
+      document.getElementById('promise-race-result').textContent = 
+        `Promise.race() winner: ${raceResult} (completed in ${totalTimeRace.toFixed(2)} ms)`;
+      console.log(`Promise.race() completed. Winner: ${raceResult}, Time: ${totalTimeRace.toFixed(2)} ms`);
+    }
+
+    /**
+     * Handles the demonstration for Promise.any().
+     * Clears previous results, runs tasks (some may fail), measures performance, 
+     * and updates the DOM with the first success or an aggregate error.
+     */
+    async function handlePromiseAnyDemo() {
+      document.getElementById('promise-any-result').textContent = 'Running Promise.any() demo...';
+
+      const operation1 = () => new Promise((resolve, reject) => setTimeout(() => reject("Operation 1 Failed"), 500));
+      const operation2 = () => new Promise(resolve => setTimeout(() => resolve("Operation 2 Succeeded (First to succeed)"), 1000));
+      const operation3 = () => new Promise(resolve => setTimeout(() => resolve("Operation 3 Succeeded (Second to succeed)"), 1500));
+
+      console.log("Button Click: Starting Promise.any() demonstration...");
+      const startTimeAny = performance.now();
+      try {
+        const anyResult = await Promise.any([operation1(), operation2(), operation3()]);
+        const endTimeAny = performance.now();
+        const totalTimeAny = endTimeAny - startTimeAny;
+        document.getElementById('promise-any-result').textContent = 
+          `Promise.any() first success: ${anyResult} (completed in ${totalTimeAny.toFixed(2)} ms)`;
+        console.log(`Promise.any() succeeded. First result: ${anyResult}, Time: ${totalTimeAny.toFixed(2)} ms`);
+      } catch (error) {
+        const endTimeAny = performance.now();
+        const totalTimeAny = endTimeAny - startTimeAny;
+        document.getElementById('promise-any-result').textContent = 
+          `All operations failed for Promise.any(). No promise fulfilled. (took ${totalTimeAny.toFixed(2)} ms). Errors: ${error.errors.join(', ')}`;
+        console.log(`All operations failed for Promise.any(). Time: ${totalTimeAny.toFixed(2)} ms`, error.errors);
+      }
+    }
+
+    /**
+     * Handles the demonstration for Promise.allSettled().
+     * Clears previous results, runs tasks (some may fail), measures performance, 
+     * and updates the DOM with the outcome of all promises.
+     */
+    async function handlePromiseAllSettledDemo() {
+      document.getElementById('promise-allSettled-results-title').textContent = "Results of Promise.allSettled():";
+      document.getElementById('promise-allSettled-results-list').innerHTML = ''; // Clear previous list items
+      document.getElementById('promise-allSettled-time').textContent = 'Running Promise.allSettled() demo...';
+
+      const settledOp1 = () => new Promise(resolve => setTimeout(() => resolve("Settled Op 1 Succeeded"), 700));
+      const settledOp2 = () => new Promise((resolve, reject) => setTimeout(() => reject("Settled Op 2 Failed"), 1200));
+      const settledOp3 = () => new Promise(resolve => setTimeout(() => resolve("Settled Op 3 Succeeded"), 900));
+
+      console.log("Button Click: Starting Promise.allSettled() demonstration...");
+      const startTimeAllSettled = performance.now();
+      const resultsAllSettled = await Promise.allSettled([settledOp1(), settledOp2(), settledOp3()]);
+      const endTimeAllSettled = performance.now();
+      const totalTimeAllSettled = endTimeAllSettled - startTimeAllSettled;
+      
+      console.log(`Promise.allSettled() completed in ${totalTimeAllSettled.toFixed(2)} ms`);
+      console.log("Results from Promise.allSettled():", resultsAllSettled);
+
+      const resultsListElement = document.getElementById('promise-allSettled-results-list');
+      resultsAllSettled.forEach(result => {
+        const listItem = document.createElement('li');
+        if (result.status === 'fulfilled') {
+          listItem.textContent = `Fulfilled: ${result.value}`;
+          listItem.style.color = 'green';
+        } else { // status === 'rejected'
+          listItem.textContent = `Rejected: ${result.reason}`;
+          listItem.style.color = 'red';
+        }
+        resultsListElement.appendChild(listItem);
+      });
+      
+      document.getElementById('promise-allSettled-time').textContent = `Promise.allSettled() took ${totalTimeAllSettled.toFixed(2)} ms to complete.`;
+    }
+
+    // Console log to confirm that all handler functions are defined.
+    console.log("JavaScript Promise demonstration handler functions defined.");
+
+    // This block ensures that event listeners are attached only after the DOM is fully loaded.
+    document.addEventListener('DOMContentLoaded', () => {
+      // Get button elements
+      const sequentialDemoButton = document.getElementById('run-sequential-demo-btn');
+      const promiseAllButton = document.getElementById('run-promise-all-btn'); 
+      const promiseRaceButton = document.getElementById('run-race-demo-btn');
+      const promiseAnyButton = document.getElementById('run-any-demo-btn');
+      const promiseAllSettledButton = document.getElementById('run-allsettled-demo-btn');
+
+      // Attach click event listeners to the respective buttons, if they exist.
+      if (sequentialDemoButton) {
+        sequentialDemoButton.addEventListener('click', handleSequentialDemo);
+      }
+      if (promiseAllButton) {
+        promiseAllButton.addEventListener('click', handlePromiseAllDemo); 
+      }
+      if (promiseRaceButton) {
+        promiseRaceButton.addEventListener('click', handlePromiseRaceDemo);
+      }
+      if (promiseAnyButton) {
+        promiseAnyButton.addEventListener('click', handlePromiseAnyDemo);
+      }
+      if (promiseAllSettledButton) {
+        promiseAllSettledButton.addEventListener('click', handlePromiseAllSettledDemo);
+      }
+      // Console log to confirm event listeners have been attached.
+      console.log("Event listeners for demo buttons attached.");
+    });
+  </script>
+
+  <p style="margin-top: 40px; text-align: center; font-size: 0.9em; color: #777;">These Promise combinators are powerful tools for managing asynchronous operations efficiently in JavaScript, leading to more responsive and performant applications.</p>
+</body>
+</html>
